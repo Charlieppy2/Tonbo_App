@@ -27,7 +27,6 @@ import com.google.common.util.concurrent.ListenableFuture;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.ImageFormat;
-import android.graphics.Rect;
 import android.graphics.YuvImage;
 
 import java.io.ByteArrayOutputStream;
@@ -90,6 +89,9 @@ public class RealAIDetectionActivity extends BaseAccessibleActivity {
     private Handler detectionBoxHandler = new Handler(Looper.getMainLooper());
     private Runnable clearDetectionBoxRunnable;
     private static final long DETECTION_BOX_DISPLAY_DURATION_MS = 2000; // Detection box retained for 2 seconds
+    
+    // Flag to track if should auto-start detection (from voice command "what's in front")
+    private boolean shouldAutoStart = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -100,9 +102,12 @@ public class RealAIDetectionActivity extends BaseAccessibleActivity {
         if (getIntent() != null && getIntent().hasExtra("language")) {
             currentLanguage = getIntent().getStringExtra("language");
         }
+        
+        // Check if should auto-start detection (from voice command "what's in front")
+        shouldAutoStart = getIntent().getBooleanExtra("auto_start_detection", false);
 
         // Initialize TTS
-        ttsManager = TTSManager.getInstance(this);
+        ttsManager =TTSManager.getInstance(this);
         ttsManager.changeLanguage(currentLanguage);
 
         initViews();
@@ -329,6 +334,16 @@ public class RealAIDetectionActivity extends BaseAccessibleActivity {
 
             updateStatusIndicator("ready");
             startButton.setEnabled(true);
+            
+            // Auto-start detection if requested (from voice command "what's in front")
+            if (shouldAutoStart) {
+                new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                    if (yoloDetector != null && !isDetecting) {
+                        Log.d(TAG, "Auto-starting detection from voice command");
+                        startDetection();
+                    }
+                }, 1500); // Wait 1.5 seconds for camera to be fully ready
+            }
 
         } catch (Exception e) {
             Log.e(TAG, "Camera setup failed: " + e.getMessage());

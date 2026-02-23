@@ -139,7 +139,7 @@
 
     </LinearLayout>
 
-    <!-- 物品名稱輸入區域 -->
+    <!-- 物品名稱輸入區域（已隱藏，改用語音輸入） -->
     <LinearLayout
         android:id="@+id/item_name_section"
         android:layout_width="0dp"
@@ -148,6 +148,7 @@
         android:gravity="center_vertical"
         android:layout_margin="16dp"
         android:spacing="12dp"
+        android:visibility="gone"
         app:layout_constraintTop_toBottomOf="@id/control_buttons"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
