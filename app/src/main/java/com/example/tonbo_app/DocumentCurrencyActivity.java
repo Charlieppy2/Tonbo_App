@@ -436,6 +436,7 @@ public class DocumentCurrencyActivity extends BaseAccessibleActivity {
                         int totalItems = ocrResults.size() + currencyResults.size();
                         String itemMsg = String.format(getString(R.string.items_detected), totalItems);
                         announceInfo(getLocalizedString("analysis_complete") + ", " + itemMsg);
+                        announceRecognitionSpeech(ocrResults, currencyResults);
                         isAnalyzing = false;
                     });
 
@@ -520,6 +521,38 @@ public class DocumentCurrencyActivity extends BaseAccessibleActivity {
         announceInfo(getString(R.string.results_cleared));
     }
 
+    private void announceRecognitionSpeech(List<OCRHelper.OCRResult> ocrResults,
+                                           List<CurrencyDetector.CurrencyResult> currencyResults) {
+        if ((ocrResults == null || ocrResults.isEmpty()) && (currencyResults == null || currencyResults.isEmpty())) {
+            String mandarin = "未识别到任何文字或货币";
+            String cantonese = "未識別到任何文字或貨幣";
+            String english = "No text or currency detected";
+            ttsManager.speak(cantonese, english, true);
+            return;
+        }
+
+        // 生成货币识别结果优先语音
+        String mandarin;
+        String cantonese;
+        String english;
+
+        if (currencyResults != null && !currencyResults.isEmpty()) {
+            CurrencyDetector.CurrencyResult r = currencyResults.get(0);
+            // 中文直接用名称避免重复金额（例如：一百元港币）
+            mandarin = String.format("识别到 %s", r.getName());
+            cantonese = String.format("識別到 %s", r.getName());
+            english = String.format("detected %s dollar", r.getAmount());
+        } else {
+            // 对于文字分析结果，简单读第一条文字内容
+            OCRHelper.OCRResult r = ocrResults.get(0);
+            mandarin = "识别到文字：" + r.getText();
+            cantonese = "識別到文字：" + r.getText();
+            english = "Detected text: " + r.getText();
+        }
+
+        ttsManager.speak(cantonese, english, true);
+    }
+
     private String translateCurrencyDetailsToEnglish(String text) {
         return text
                 .replace("識別到", "Detected")
@@ -576,8 +609,8 @@ public class DocumentCurrencyActivity extends BaseAccessibleActivity {
     }
 
     private String translateCurrencyTypeToEnglish(String type) {
-        if ("紙幣".equals(type)) return "Banknote";
-        if ("硬幣".equals(type)) return "Coin";
+        if ("紙幣".equals(type)) return "banknote";
+        if ("硬幣".equals(type)) return "coin";
         return type;
     }
 
