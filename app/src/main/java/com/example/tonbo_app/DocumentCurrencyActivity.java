@@ -48,6 +48,7 @@ public class DocumentCurrencyActivity extends BaseAccessibleActivity {
     private Button readButton;
     private Button clearButton;
     private TextView pageTitle;
+    private TextView resultsTitle;
     private TextView resultsText;
 
     private ExecutorService cameraExecutor;
@@ -103,6 +104,7 @@ public class DocumentCurrencyActivity extends BaseAccessibleActivity {
         readButton = findViewById(R.id.readButton);
         clearButton = findViewById(R.id.clearButton);
         pageTitle = findViewById(R.id.pageTitle);
+        resultsTitle = findViewById(R.id.resultsTitle);
         resultsText = findViewById(R.id.resultsText);
 
         // 返回按鈕
@@ -178,6 +180,10 @@ public class DocumentCurrencyActivity extends BaseAccessibleActivity {
         if (clearButton != null) {
             clearButton.setText(getLocalizedString("clear"));
         }
+
+        if (resultsTitle != null) {
+            resultsTitle.setText(getLocalizedString("scan_results_title"));
+        }
     }
     
     /**
@@ -232,6 +238,54 @@ public class DocumentCurrencyActivity extends BaseAccessibleActivity {
                     return "清除";
                 } else {
                     return "清除";
+                }
+            case "result_text_header":
+                if ("english".equals(currentLanguage)) {
+                    return "📄 Text recognition results:";
+                } else if ("mandarin".equals(currentLanguage)) {
+                    return "📄 文字识别结果：";
+                } else {
+                    return "📄 文字識別結果：";
+                }
+            case "result_currency_header":
+                if ("english".equals(currentLanguage)) {
+                    return "💰 Currency recognition results:";
+                } else if ("mandarin".equals(currentLanguage)) {
+                    return "💰 货币识别结果：";
+                } else {
+                    return "💰 貨幣識別結果：";
+                }
+            case "result_none":
+                if ("english".equals(currentLanguage)) {
+                    return "No text or currency recognized";
+                } else if ("mandarin".equals(currentLanguage)) {
+                    return "未识别到任何文字或货币";
+                } else {
+                    return "未識別到任何文字或貨幣";
+                }
+            case "scan_results_title":
+                if ("english".equals(currentLanguage)) {
+                    return "Scan Results";
+                } else if ("mandarin".equals(currentLanguage)) {
+                    return "扫描结果";
+                } else {
+                    return "掃描結果";
+                }
+            case "analyzing":
+                if ("english".equals(currentLanguage)) {
+                    return "Analyzing image...";
+                } else if ("mandarin".equals(currentLanguage)) {
+                    return "正在分析图像...";
+                } else {
+                    return "正在分析圖像...";
+                }
+            case "analysis_complete":
+                if ("english".equals(currentLanguage)) {
+                    return "Analysis complete";
+                } else if ("mandarin".equals(currentLanguage)) {
+                    return "分析完成";
+                } else {
+                    return "分析完成";
                 }
             default:
                 return "";
@@ -347,17 +401,26 @@ public class DocumentCurrencyActivity extends BaseAccessibleActivity {
             return;
         }
 
-        announceInfo(getString(R.string.capturing_analyzing));
-        updateStatus("正在分析圖像...");
+        announceInfo(getLocalizedString("analyzing"));
+        updateStatus(getLocalizedString("analyzing"));
 
         if (currentBitmap != null) {
             isAnalyzing = true;
             
             new Thread(() -> {
                 try {
-                    // 同時進行OCR和貨幣檢測
-                    List<OCRHelper.OCRResult> ocrResults = ocrHelper.recognizeText(currentBitmap);
-                    List<CurrencyDetector.CurrencyResult> currencyResults = currencyDetector.detectCurrency(currentBitmap);
+                    List<OCRHelper.OCRResult> ocrResults;
+                    List<CurrencyDetector.CurrencyResult> currencyResults;
+
+                    if (isTextMode) {
+                        // 文字分析模式：只做 OCR
+                        ocrResults = ocrHelper.recognizeText(currentBitmap);
+                        currencyResults = java.util.Collections.emptyList();
+                    } else {
+                        // 貨幣分析模式：只做貨幣檢測
+                        ocrResults = java.util.Collections.emptyList();
+                        currencyResults = currencyDetector.detectCurrency(currentBitmap);
+                    }
 
                     // 保存結果
                     lastOCRResults = ocrResults;
@@ -369,9 +432,10 @@ public class DocumentCurrencyActivity extends BaseAccessibleActivity {
 
                     runOnUiThread(() -> {
                         updateResults(combinedResult);
-                        updateStatus("分析完成");
-                        announceInfo("分析完成，共識別到" + 
-                            String.format(getString(R.string.items_detected), (ocrResults.size() + currencyResults.size())));
+                        updateStatus(getLocalizedString("analysis_complete"));
+                        int totalItems = ocrResults.size() + currencyResults.size();
+                        String itemMsg = String.format(getString(R.string.items_detected), totalItems);
+                        announceInfo(getLocalizedString("analysis_complete") + ", " + itemMsg);
                         isAnalyzing = false;
                     });
 
@@ -394,22 +458,26 @@ public class DocumentCurrencyActivity extends BaseAccessibleActivity {
     private String formatCombinedResults(List<OCRHelper.OCRResult> ocrResults, 
                                        List<CurrencyDetector.CurrencyResult> currencyResults) {
         StringBuilder sb = new StringBuilder();
-        
+
         if (!ocrResults.isEmpty()) {
-            sb.append("📄 文字識別結果：\n\n");
+            sb.append(getLocalizedString("result_text_header")).append("\n\n");
             sb.append(ocrHelper.formatDetailedResults(ocrResults));
             sb.append("\n\n");
         }
-        
+
         if (!currencyResults.isEmpty()) {
-            sb.append("💰 貨幣識別結果：\n\n");
-            sb.append(currencyDetector.formatDetailedResults(currencyResults));
+            sb.append(getLocalizedString("result_currency_header")).append("\n\n");
+            if ("english".equals(currentLanguage)) {
+                sb.append(formatCurrencyResultsEnglish(currencyResults));
+            } else {
+                sb.append(currencyDetector.formatDetailedResults(currencyResults));
+            }
         }
-        
+
         if (ocrResults.isEmpty() && currencyResults.isEmpty()) {
-            sb.append("未識別到任何文字或貨幣");
+            sb.append(getLocalizedString("result_none"));
         }
-        
+
         return sb.toString();
     }
 
@@ -450,6 +518,93 @@ public class DocumentCurrencyActivity extends BaseAccessibleActivity {
             resultsText.setText("");
         }
         announceInfo(getString(R.string.results_cleared));
+    }
+
+    private String translateCurrencyDetailsToEnglish(String text) {
+        return text
+                .replace("識別到", "Detected")
+                .replace("種貨幣：", " currency types:\n\n")
+                .replace("面額：", "Amount: ")
+                .replace("元", " dollars")
+                .replace("類型：", "Type: ")
+                .replace("顏色：", "Color: ")
+                .replace("圖案：", "Design: ")
+                .replace("置信度：", "Confidence: ")
+                .replace("識別方式：", "Detection method: ")
+                .replace("未識別到任何貨幣", "No currency detected");
+    }
+
+    private String formatCurrencyResultsEnglish(List<CurrencyDetector.CurrencyResult> results) {
+        if (results.isEmpty()) {
+            return "No currency detected";
+        }
+
+        StringBuilder sb = new StringBuilder();
+        sb.append(String.format("Detected %d currency types:\n\n", results.size()));
+
+        for (int i = 0; i < results.size(); i++) {
+            CurrencyDetector.CurrencyResult result = results.get(i);
+            String englishName = translateCurrencyNameToEnglish(result.getName());
+            sb.append(String.format("%d. %s\n", i + 1, englishName));
+            sb.append(String.format("   Amount: %s dollars\n", result.getAmount()));
+            sb.append(String.format("   Type: %s\n", translateCurrencyTypeToEnglish(result.getType())));
+            // 不显示 Color/Design
+            sb.append(String.format("   Confidence: %.0f%%\n", result.getConfidence() * 100));
+            sb.append(String.format("   Detection method: %s\n\n", translateDetectionMethodToEnglish(result.getDetectionMethod())));
+        }
+
+        return sb.toString();
+    }
+
+    private String translateCurrencyNameToEnglish(String name) {
+        switch (name) {
+            case "一元港幣": return "HKD 1";
+            case "二元港幣": return "HKD 2";
+            case "五元港幣": return "HKD 5";
+            case "十元港幣": return "HKD 10";
+            case "二十元港幣": return "HKD 20";
+            case "五十元港幣": return "HKD 50";
+            case "一百元港幣": return "HKD 100";
+            case "五百元港幣": return "HKD 500";
+            case "一千元港幣": return "HKD 1000";
+            default:
+                if (name.contains("港幣")) {
+                    return name.replace("港幣", "HKD");
+                }
+                return name;
+        }
+    }
+
+    private String translateCurrencyTypeToEnglish(String type) {
+        if ("紙幣".equals(type)) return "Banknote";
+        if ("硬幣".equals(type)) return "Coin";
+        return type;
+    }
+
+    private String translateCurrencyColorToEnglish(String color) {
+        switch (color) {
+            case "銀色": return "Silver";
+            case "綠色": return "Green";
+            case "藍色": return "Blue";
+            case "紫色": return "Purple";
+            case "紅色": return "Red";
+            case "棕色": return "Brown";
+            case "金色": return "Gold";
+            default: return color;
+        }
+    }
+
+    private String translateCurrencyDesignToEnglish(String design) {
+        if ("紫荊花".equals(design)) return "Bauhinia";
+        if ("獅子山".equals(design)) return "Lion Rock";
+        return design;
+    }
+
+    private String translateDetectionMethodToEnglish(String method) {
+        if ("文字識別".equals(method)) return "Text recognition";
+        if ("貨幣符號識別".equals(method)) return "Currency symbol recognition";
+        if ("圖像分析".equals(method)) return "Image analysis";
+        return method;
     }
 
     private void updateStatus(String status) {
@@ -735,16 +890,16 @@ public class DocumentCurrencyActivity extends BaseAccessibleActivity {
         
         // 設置標題
         if (isTextMode) {
-            dialogTitle.setText("文字識別結果");
+            dialogTitle.setText(currentLanguage.equals("english") ? "Text recognition results" : "文字識別結果");
         } else {
-            dialogTitle.setText("貨幣識別結果");
+            dialogTitle.setText(currentLanguage.equals("english") ? "Currency recognition results" : "貨幣識別結果");
         }
         
         // 格式化結果文本
         StringBuilder resultBuilder = new StringBuilder();
         
         if (!ocrResults.isEmpty()) {
-            resultBuilder.append("📄 文字識別結果：\n\n");
+            resultBuilder.append(getLocalizedString("result_text_header")).append("\n\n");
             for (int i = 0; i < ocrResults.size(); i++) {
                 OCRHelper.OCRResult result = ocrResults.get(i);
                 resultBuilder.append(result.getText());
@@ -758,13 +913,14 @@ public class DocumentCurrencyActivity extends BaseAccessibleActivity {
             if (resultBuilder.length() > 0) {
                 resultBuilder.append("\n\n");
             }
-            resultBuilder.append("💰 貨幣識別結果：\n\n");
+            resultBuilder.append(getLocalizedString("result_currency_header")).append("\n\n");
             for (int i = 0; i < currencyResults.size(); i++) {
                 CurrencyDetector.CurrencyResult result = currencyResults.get(i);
                 resultBuilder.append(result.getName())
                             .append(" ")
                             .append(result.getAmount())
-                            .append("元");
+                            .append(" ")
+                            .append(currentLanguage.equals("english") ? "dollars" : "元");
                 if (i < currencyResults.size() - 1) {
                     resultBuilder.append("\n\n");
                 }
@@ -772,7 +928,7 @@ public class DocumentCurrencyActivity extends BaseAccessibleActivity {
         }
         
         if (resultBuilder.length() == 0) {
-            resultBuilder.append("未識別到任何內容");
+            resultBuilder.append(getLocalizedString("result_none"));
         }
         
         resultText.setText(resultBuilder.toString());
@@ -795,9 +951,16 @@ public class DocumentCurrencyActivity extends BaseAccessibleActivity {
         speakButton.setOnClickListener(v -> {
             vibrationManager.vibrateClick();
             String textToSpeak = resultBuilder.toString();
-            if (textToSpeak.isEmpty() || textToSpeak.equals("未識別到任何內容")) {
-                announceInfo("沒有內容可朗讀");
+            if (textToSpeak.isEmpty() || textToSpeak.equals(getLocalizedString("result_none"))) {
+                announceInfo(currentLanguage.equals("english") ? "No content to read" : "沒有內容可朗讀");
             } else {
+                if ("english".equals(currentLanguage)) {
+                    textToSpeak = translateCurrencyDetailsToEnglish(textToSpeak)
+                            .replace("識別到", "Detected")
+                            .replace("文字識別結果", "Text recognition results")
+                            .replace("貨幣識別結果", "Currency recognition results");
+                }
+
                 String cantoneseText = currentLanguage.equals("english") ? "" : textToSpeak;
                 String englishText = currentLanguage.equals("english") ? textToSpeak : "";
                 ttsManager.speak(cantoneseText, englishText, true);
