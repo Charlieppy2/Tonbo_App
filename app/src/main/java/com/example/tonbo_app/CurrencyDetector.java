@@ -51,11 +51,18 @@ public class CurrencyDetector {
      * @return 貨幣檢測結果列表
      */
     public List<CurrencyResult> detectCurrency(Bitmap bitmap) {
+        return detectCurrency(bitmap, 0);
+    }
+
+    /**
+     * 檢測圖片中的貨幣（支持 OCR 旋轉角度）
+     */
+    public List<CurrencyResult> detectCurrency(Bitmap bitmap, int rotationDegrees) {
         Map<String, CurrencyResult> uniqueResults = new LinkedHashMap<>();
 
         try {
             // 使用OCR識別文字
-            List<OCRHelper.OCRResult> ocrResults = ocrHelper.recognizeText(bitmap);
+            List<OCRHelper.OCRResult> ocrResults = ocrHelper.recognizeText(bitmap, rotationDegrees);
 
             // 分析OCR結果尋找貨幣信息
             for (OCRHelper.OCRResult ocrResult : ocrResults) {
